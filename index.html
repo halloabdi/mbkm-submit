@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBKM Submission</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Import Map untuk mengatur dependensi (React, Firebase, Lucide) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+            "lucide-react": "https://esm.sh/lucide-react@0.468.0?external=react"
+        }
+    }
+    </script>
+
+    <!-- Babel Standalone untuk kompilasi JSX di browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Konfigurasi Font Poppins untuk Tailwind -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Poppins', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="root"></div>
+
+    <!-- Script Utama Aplikasi -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+        import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+        import { Upload, FileText, CheckCircle, XCircle, Users, Lock, Send, Trash2, AlertTriangle, Menu, Eye, Unlock, CloudUpload, Loader2, Info, FolderCheck, ExternalLink, Filter, ChevronDown, Search } from 'lucide-react';
+
+        // --- KONFIGURASI PENTING ---
+        // URL INI TELAH DIPERBARUI KE VERSI 7 (13 Des 2025 - 13:41)
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx3h3mgp1J7t6BxxRNCqxQskOzMBhgwd29eGM6HD1TSTny_9zORcOuW9HCdHfssAM1J/exec"; 
+
+        // --- FIREBASE SETUP ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAH9pgPIPnDUJ9FPrEbdc3jY1u8xcyDhB0",
+            authDomain: "formmagang-mbkm.firebaseapp.com",
+            projectId: "formmagang-mbkm",
+            storageBucket: "formmagang-mbkm.firebasestorage.app",
+            messagingSenderId: "238308798946",
+            appId: "1:238308798946:web:967c31ea5358ad604d89bb",
+            measurementId: "G-RGG49ETJKT"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Hapus 'export default' karena ini berjalan di dalam script tag HTML
+        function App() {
+            const [user, setUser] = useState(null);
+            const [viewMode, setViewMode] = useState('form');
+            const [submissions, setSubmissions] = useState([]);
+            
+            // State Search, Filter & Sort
+            const [searchQuery, setSearchQuery] = useState(''); // State untuk pencarian teks
+            const [filterConfig, setFilterConfig] = useState({
+                sortName: '',       // '' | 'asc' (A-Z) | 'desc' (Z-A)
+                sortTime: 'newest', // 'newest' | 'oldest'
+                filterClass: '',    // '' | 'AGRINAK A' | ...
+                filterDocType: ''   // '' | 'MAGANG BROILER' | ...
+            });
+
+            const [formData, setFormData] = useState({
+                nama: '', nim: '', kelas: '', jenisDokumen: '', judulLaporan: '', files: []
+            });
+            
+            const [status, setStatus] = useState({ loading: false, type: '', msg: '' }); 
+            const [uploadSuccessData, setUploadSuccessData] = useState(null); 
+
+            // Security & Modal States
+            const [showCodeModal, setShowCodeModal] = useState(false);
+            const [codeInput, setCodeInput] = useState('');
+            const [showErrorPopup, setShowErrorPopup] = useState(false);
+            const [isAuthenticatedAdmin, setIsAuthenticatedAdmin] = useState(false);
+            const [pendingAction, setPendingAction] = useState(null);
+
+            // --- AUTHENTICATION ---
+            useEffect(() => {
+                const initAuth = async () => {
+                    // Cek variabel global __initial_auth_token (biasanya di-inject server, di sini kita pakai fallback)
+                    if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+                        await signInWithCustomToken(auth, window.__initial_auth_token).catch(() => signInAnonymously(auth));
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                };
+                initAuth();
+                onAuthStateChanged(auth, setUser);
+            }, []);
+
+            // --- DATA SYNC ---
+            useEffect(() => {
+                const q = query(collection(db, 'mbkm_submissions'));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setSubmissions(data);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // --- FILTERING & SORTING LOGIC ---
+            const getProcessedSubmissions = () => {
+                let result = [...submissions];
+
+                // 1. Search Query Filter (Pencarian Kata Kunci)
+                if (searchQuery) {
+                    const lowerQuery = searchQuery.toLowerCase();
+                    result = result.filter(item => {
+                        const dateStr = item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString('id-ID').toLowerCase() : '';
+                        return (
+                            (item.nama && item.nama.toLowerCase().includes(lowerQuery)) ||
+                            (item.nim && item.nim.toLowerCase().includes(lowerQuery)) ||
+                            (item.kelas && item.kelas.toLowerCase().includes(lowerQuery)) ||
+                            (item.jenisDokumen && item.jenisDokumen.toLowerCase().includes(lowerQuery)) ||
+                            (item.judulLaporan && item.judulLaporan.toLowerCase().includes(lowerQuery)) ||
+                            dateStr.includes(lowerQuery)
+                        );
+                    });
+                }
+
+                // 2. Filter Kelas
+                if (filterConfig.filterClass) {
+                    result = result.filter(item => item.kelas === filterConfig.filterClass);
+                }
+
+                // 3. Filter Jenis Dokumen
+                if (filterConfig.filterDocType) {
+                    result = result.filter(item => item.jenisDokumen === filterConfig.filterDocType);
+                }
+
+                // 4. Sorting
+                result.sort((a, b) => {
+                    // Jika sorting nama aktif, prioritaskan itu
+                    if (filterConfig.sortName) {
+                        const nameA = a.nama ? a.nama.toLowerCase() : '';
+                        const nameB = b.nama ? b.nama.toLowerCase() : '';
+                        if (filterConfig.sortName === 'asc') return nameA.localeCompare(nameB);
+                        if (filterConfig.sortName === 'desc') return nameB.localeCompare(nameA);
+                    }
+
+                    // Default sorting berdasarkan waktu
+                    const timeA = a.createdAt?.seconds || 0;
+                    const timeB = b.createdAt?.seconds || 0;
+                    
+                    if (filterConfig.sortTime === 'oldest') {
+                        return timeA - timeB;
+                    } else {
+                        return timeB - timeA; // Newest default
+                    }
+                });
+
+                return result;
+            };
+
+            const processedSubmissions = getProcessedSubmissions();
+
+            // --- HANDLERS ---
+
+            const handleFileChange = (e) => {
+                const files = Array.from(e.target.files);
+                if (formData.files.length + files.length > 5) return alert("Maksimal 5 file.");
+                
+                const filePromises = files.map(file => {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({
+                            base64: reader.result.split(',')[1],
+                            name: file.name,
+                            type: file.type,
+                            size: file.size
+                        });
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                Promise.all(filePromises).then(newFiles => {
+                    setFormData(prev => ({ ...prev, files: [...prev.files, ...newFiles] }));
+                });
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!user) return alert("Menunggu koneksi database...");
+                if (formData.files.length === 0) return alert("Pilih minimal 1 file.");
+
+                setStatus({ loading: true, type: 'upload', msg: 'Memulai...' });
+
+                try {
+                    const uploadedLinks = [];
+                    let lastUploadedFileUrl = "";
+                    let targetFolderName = "";
+
+                    for (let i = 0; i < formData.files.length; i++) {
+                        const file = formData.files[i];
+                        setStatus({ loading: true, type: 'upload', msg: `Mengupload file ${i+1} dari ${formData.files.length}...` });
+
+                        // UPLOAD KE GOOGLE DRIVE VIA APPS SCRIPT
+                        const response = await fetch(SCRIPT_URL, {
+                            method: 'POST',
+                            headers: { "Content-Type": "text/plain" }, 
+                            body: JSON.stringify({
+                                action: 'upload',
+                                base64: file.base64,
+                                mimeType: file.type,
+                                filename: `${formData.nama}_${formData.kelas}_${file.name}`,
+                                nama: formData.nama, nim: formData.nim, kelas: formData.kelas
+                            })
+                        });
+
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            targetFolderName = result.folderName || "Folder MBKM"; 
+                            lastUploadedFileUrl = result.fileUrl;
+                            uploadedLinks.push({
+                                name: file.name,
+                                driveUrl: result.fileUrl,
+                                fileId: result.fileId,
+                                type: file.type.includes('pdf') ? 'PDF' : 'DOCX'
+                            });
+                        } else {
+                            throw new Error("Gagal menyimpan ke Drive: " + (result.message || "Error Script"));
+                        }
+                    }
+
+                    // SIMPAN KE FIREBASE
+                    await addDoc(collection(db, 'mbkm_submissions'), {
+                        ...formData,
+                        files: uploadedLinks,
+                        createdAt: serverTimestamp(),
+                        userId: user.uid
+                    });
+
+                    setUploadSuccessData({ folder: targetFolderName, url: lastUploadedFileUrl });
+                    setFormData({ nama: '', nim: '', kelas: '', jenisDokumen: '', judulLaporan: '', files: [] });
+
+                } catch (err) {
+                    alert("TERJADI ERROR SAAT UPLOAD: " + err.message + "\n\nPastikan script Google Apps sudah di-deploy dengan benar.");
+                } finally {
+                    setStatus({ loading: false, type: '', msg: '' });
+                }
+            };
+
+            const executeDelete = async (payload) => {
+                setStatus({ loading: true, type: 'delete', msg: 'Menghapus...' });
+                
+                try {
+                    // 1. HAPUS FILE DI GOOGLE DRIVE
+                    if (payload.files && payload.files.length > 0) {
+                        for (const file of payload.files) {
+                            let fid = file.fileId;
+                            // Fallback regex jika fileId tidak tersimpan
+                            if (!fid && file.driveUrl) {
+                                const m = file.driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                                if (m) fid = m[1];
+                            }
+
+                            if (fid) {
+                                await fetch(SCRIPT_URL, {
+                                    method: 'POST',
+                                    headers: { "Content-Type": "text/plain" },
+                                    body: JSON.stringify({ action: 'delete', fileId: fid })
+                                }).catch(e => console.warn("Gagal hapus file drive (skip):", e));
+                            }
+                        }
+                    }
+
+                    // 2. HAPUS DATA DI FIREBASE
+                    await deleteDoc(doc(db, 'mbkm_submissions', payload.id));
+                    alert("Data berhasil dihapus dari Sistem dan File dibuang dari Drive.");
+                } catch (e) {
+                    alert("Gagal menghapus data: " + e.message);
+                } finally {
+                    setStatus({ loading: false, type: '', msg: '' });
+                }
+            };
+
+            // --- SECURITY FLOW ---
+            const checkCode = () => {
+                if (codeInput === "DANING2025") {
+                    setIsAuthenticatedAdmin(true);
+                    setShowCodeModal(false);
+                    setCodeInput('');
+                    if (pendingAction) {
+                        if (pendingAction.actionType === 'delete') {
+                            executeDelete(pendingAction.data);
+                        } else if (pendingAction.actionType === 'view') {
+                            window.open(pendingAction.data, '_blank');
+                        }
+                        setPendingAction(null);
+                    }
+                } else {
+                    setShowCodeModal(false);
+                    setShowErrorPopup(true);
+                }
+            };
+
+            const requestProtectedAction = (actionType, data) => {
+                if (isAuthenticatedAdmin) {
+                    if (actionType === 'delete') {
+                        if(confirm(`Hapus permanen data milik ${data.nama}?`)) executeDelete(data);
+                    } else {
+                        window.open(data, '_blank');
+                    }
+                } else {
+                    setPendingAction({ actionType, data });
+                    setShowCodeModal(true);
+                }
+            };
+
+            const fontBold = "font-bold font-poppins";
+            const fontRegular = "font-normal font-poppins";
+
+            return (
+                <div className="min-h-screen bg-gray-50 text-gray-800 font-poppins selection:bg-blue-200">
+                    <style>{`
+                        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;800;900&display=swap'); 
+                        .font-poppins { font-family: 'Poppins', sans-serif; }
+                        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+                    `}</style>
+
+                    {/* HEADER */}
+                    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+                        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-black font-poppins text-blue-900 tracking-tight">
+                                    MBKM<span className="text-blue-500">.</span>Submission
+                                </h1>
+                                <p className={`text-xs text-gray-500 ${fontRegular}`}>Kampus Merdeka - Integrasi Google Drive</p>
+                            </div>
+                            <button 
+                                onClick={() => setViewMode(viewMode === 'form' ? 'list' : 'form')}
+                                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-full transition-all transform hover:scale-105"
+                            >
+                                {viewMode === 'form' ? <Users size={18} /> : <FileText size={18} />}
+                                <span className={`text-sm ${fontBold}`}>{viewMode === 'form' ? 'Lihat Data' : 'Form Upload'}</span>
+                            </button>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto px-4 py-8">
+                        
+                        {viewMode === 'form' && (
+                            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 animate-fade-in overflow-hidden">
+                                <div className="bg-blue-600 p-6 text-white relative">
+                                    <h2 className="text-2xl font-black font-poppins mb-2">Form Pengumpulan</h2>
+                                    <p className={`text-blue-100 ${fontRegular}`}>Pastikan file yang diupload sudah benar.</p>
+                                </div>
+                                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                                    {/* Form Inputs */}
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Nama Lengkap *</label>
+                                            <input required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} placeholder="Nama Lengkap" value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>NIM *</label>
+                                            <input required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} placeholder="Hanya angka & titik" value={formData.nim} onChange={e => {if(/^[0-9.]*$/.test(e.target.value)) setFormData({...formData, nim: e.target.value})}} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Kelas *</label>
+                                            <select required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} value={formData.kelas} onChange={e => setFormData({...formData, kelas: e.target.value})}>
+                                                <option value="">Pilih Kelas...</option>
+                                                <option value="AGRINAK A">AGRINAK A</option>
+                                                <option value="AGRINAK B">AGRINAK B</option>
+                                                <option value="AGRINAK C">AGRINAK C</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Jenis Dokumen *</label>
+                                            <select required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} value={formData.jenisDokumen} onChange={e => setFormData({...formData, jenisDokumen: e.target.value})}>
+                                                <option value="">Pilih Jenis...</option>
+                                                <option value="MAGANG BROILER">MAGANG BROILER</option>
+                                                <option value="MAGANG RPHU/RPA">MAGANG RPHU/RPA</option>
+                                                <option value="PKM">PKM (PENGABDIAN)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Judul Laporan *</label>
+                                        <input required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} placeholder="Judul Lengkap" value={formData.judulLaporan} onChange={e => setFormData({...formData, judulLaporan: e.target.value})} />
+                                    </div>
+
+                                    <div>
+                                        <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Upload File (PDF/DOCX) *</label>
+                                        <div className="border-2 border-dashed border-blue-300 rounded-2xl p-6 bg-blue-50 text-center hover:bg-blue-100 transition relative">
+                                            <input type="file" multiple accept=".pdf,.docx,.doc" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                            <CloudUpload className="mx-auto text-blue-500 mb-2" size={32} />
+                                            <p className={`text-sm text-gray-600 ${fontBold}`}>Klik atau seret file (Max 5 file, 10MB)</p>
+                                        </div>
+                                        {formData.files.map((f, i) => (
+                                            <div key={i} className="flex justify-between items-center p-3 mt-2 bg-white border border-gray-200 rounded-xl">
+                                                <span className="text-sm truncate text-blue-600 font-bold">{f.name}</span>
+                                                <button type="button" onClick={() => setFormData(prev => ({...prev, files: prev.files.filter((_, idx) => idx !== i)}))}><Trash2 className="text-red-400" size={18} /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <button type="submit" disabled={status.loading} className={`w-full flex justify-center items-center gap-2 bg-gray-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-gray-800 transition disabled:opacity-70`}>
+                                        {status.loading && status.type === 'upload' ? <><Loader2 className="animate-spin" /> {status.msg}</> : <><Send size={18} /> Kirim Laporan</>}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+
+                        {viewMode === 'list' && (
+                            <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 animate-fade-in">
+                                <div className="flex flex-col mb-6 gap-4">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h2 className="text-2xl font-black font-poppins text-gray-800">Data Masuk</h2>
+                                            <div className={`text-xs mt-1 flex items-center gap-1 ${isAuthenticatedAdmin ? 'text-green-600' : 'text-gray-500'}`}>
+                                                {isAuthenticatedAdmin ? <Unlock size={12}/> : <Lock size={12}/>}
+                                                {isAuthenticatedAdmin ? 'Admin Aktif' : 'Dokumen Terkunci'}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Total Counter */}
+                                        <div className="hidden md:block bg-blue-100 text-blue-800 px-4 py-1 rounded-full text-xs font-bold">Total: {submissions.length}</div>
+                                    </div>
+                                    
+                                    {/* FILTER & SEARCH BAR */}
+                                    <div className="flex flex-col gap-4">
+                                        {/* SEARCH INPUT */}
+                                        <div className="relative w-full">
+                                            <Search className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                                            <input 
+                                                type="text"
+                                                placeholder="Cari Nama, NIM, Judul, Kelas, Dokumen, atau Waktu..."
+                                                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-poppins focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                            />
+                                        </div>
+
+                                        {/* DROPDOWN FILTERS */}
+                                        <div className="flex flex-wrap gap-2 w-full">
+                                            <div className="relative flex-grow md:flex-grow-0">
+                                                <select 
+                                                    className={`w-full appearance-none bg-white border border-gray-200 text-gray-700 py-2 pl-3 pr-8 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm`}
+                                                    value={filterConfig.sortName}
+                                                    onChange={(e) => setFilterConfig({...filterConfig, sortName: e.target.value})}
+                                                >
+                                                    <option value="">Urut Nama...</option>
+                                                    <option value="asc">Nama (A-Z)</option>
+                                                    <option value="desc">Nama (Z-A)</option>
+                                                </select>
+                                                <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
+                                            </div>
+
+                                            <div className="relative flex-grow md:flex-grow-0">
+                                                <select 
+                                                    className={`w-full appearance-none bg-white border border-gray-200 text-gray-700 py-2 pl-3 pr-8 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm`}
+                                                    value={filterConfig.sortTime}
+                                                    onChange={(e) => setFilterConfig({...filterConfig, sortTime: e.target.value})}
+                                                >
+                                                    <option value="newest">Waktu (Terbaru)</option>
+                                                    <option value="oldest">Waktu (Terlama)</option>
+                                                </select>
+                                                <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
+                                            </div>
+
+                                            <div className="relative flex-grow md:flex-grow-0">
+                                                <select 
+                                                    className={`w-full appearance-none bg-white border border-gray-200 text-gray-700 py-2 pl-3 pr-8 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm`}
+                                                    value={filterConfig.filterClass}
+                                                    onChange={(e) => setFilterConfig({...filterConfig, filterClass: e.target.value})}
+                                                >
+                                                    <option value="">Semua Kelas</option>
+                                                    <option value="AGRINAK A">AGRINAK A</option>
+                                                    <option value="AGRINAK B">AGRINAK B</option>
+                                                    <option value="AGRINAK C">AGRINAK C</option>
+                                                </select>
+                                                <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
+                                            </div>
+
+                                            <div className="relative flex-grow md:flex-grow-0">
+                                                <select 
+                                                    className={`w-full appearance-none bg-white border border-gray-200 text-gray-700 py-2 pl-3 pr-8 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm`}
+                                                    value={filterConfig.filterDocType}
+                                                    onChange={(e) => setFilterConfig({...filterConfig, filterDocType: e.target.value})}
+                                                >
+                                                    <option value="">Semua Jenis</option>
+                                                    <option value="MAGANG BROILER">MAGANG BROILER</option>
+                                                    <option value="MAGANG RPHU/RPA">MAGANG RPHU/RPA</option>
+                                                    <option value="PKM">PKM (PENGABDIAN)</option>
+                                                </select>
+                                                <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {processedSubmissions.length === 0 ? (
+                                        <div className="text-center text-gray-400 py-10 border-2 border-dashed border-gray-100 rounded-2xl">
+                                            <Filter size={40} className="mx-auto mb-2 opacity-20" />
+                                            <p>Tidak ada data yang cocok dengan filter/pencarian.</p>
+                                        </div>
+                                    ) : processedSubmissions.map(item => (
+                                        <div key={item.id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-md transition">
+                                            <div className="flex flex-col md:flex-row justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <h3 className={`text-lg ${fontBold} text-gray-900`}>{item.nama}</h3>
+                                                    <p className="text-blue-600 text-sm font-bold">{item.kelas} | {item.jenisDokumen}</p>
+                                                    <p className="text-gray-500 text-sm italic">"{item.judulLaporan}"</p>
+                                                </div>
+                                                <div className="flex flex-col gap-2 min-w-[140px]">
+                                                    {item.files?.map((f, i) => (
+                                                        <button key={i} onClick={() => requestProtectedAction('view', f.driveUrl)} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded-lg border hover:bg-blue-50 transition group">
+                                                            <span className="truncate max-w-[100px] text-gray-600">{f.name}</span>
+                                                            {isAuthenticatedAdmin ? <Eye size={14} className="text-blue-500"/> : <Lock size={14} className="text-gray-300 group-hover:text-gray-500"/>}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-400">
+                                                <span>{item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString() : '-'}</span>
+                                                <button onClick={() => requestProtectedAction('delete', item)} disabled={status.loading} className="flex items-center gap-1 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition font-bold disabled:opacity-50">
+                                                    {status.loading && status.type === 'delete' ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>} Hapus
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-4 text-center text-xs text-gray-400 font-bold">
+                                    Menampilkan {processedSubmissions.length} dari {submissions.length} Data
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Success Modal */}
+                    {uploadSuccessData && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500"><CheckCircle size={32} /></div>
+                                <h3 className="text-xl font-black text-gray-900">Upload Berhasil!</h3>
+                                <p className="text-gray-600 text-sm mt-2">Data berhasil disimpan.</p>
+                                
+                                <div className="mt-4 bg-blue-50 p-4 rounded-xl border border-blue-100 text-left">
+                                    <p className="text-xs text-gray-500 mb-1">Tersimpan di Folder:</p>
+                                    <div className="flex items-center gap-2 font-bold text-blue-800 text-sm mb-3">
+                                        <FolderCheck size={16}/> {uploadSuccessData.folder}
+                                    </div>
+                                    <a href={uploadSuccessData.url} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white text-sm py-2 rounded-lg hover:bg-blue-700 transition">
+                                        <ExternalLink size={14}/> Cek File di Drive
+                                    </a>
+                                </div>
+                                
+                                <button onClick={() => setUploadSuccessData(null)} className="mt-4 w-full bg-gray-100 text-gray-600 py-2 rounded-xl font-bold hover:bg-gray-200">Tutup</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Code Modal */}
+                    {showCodeModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-black text-gray-900">Area Terbatas</h3>
+                                    <button onClick={() => {setShowCodeModal(false); setPendingAction(null);}}><XCircle className="text-gray-400" /></button>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-4">Masukkan kode akses untuk melanjutkan:</p>
+                                <input autoFocus type="password" className="w-full border-2 border-gray-200 rounded-xl p-3 text-center tracking-widest text-lg font-bold mb-4 focus:ring-2 focus:ring-blue-500 outline-none" value={codeInput} onChange={e => setCodeInput(e.target.value)} placeholder="••••••••" />
+                                <button onClick={checkCode} className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black transition">Buka Akses</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error Popup */}
+                    {showErrorPopup && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-900/30 backdrop-blur-md">
+                            <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-4 border-red-50">
+                                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 animate-pulse"><AlertTriangle size={40} /></div>
+                                <h3 className="text-2xl font-black text-gray-900 mb-2">Kode Salah!</h3>
+                                <p className="text-sm text-gray-600 mb-6">Anda tidak memiliki izin untuk akses ini.</p>
+                                <button onClick={() => setShowErrorPopup(false)} className="text-gray-400 underline text-sm hover:text-gray-600">Tutup</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // --- MOUNT REACT APP KE DIV 'root' ---
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+</html>
