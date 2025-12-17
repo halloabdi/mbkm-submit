@@ -75,7 +75,7 @@
                 sortName: '',       // '' | 'asc' (A-Z) | 'desc' (Z-A)
                 sortTime: 'newest', // 'newest' | 'oldest'
                 filterClass: '',    // '' | 'AGRINAK A' | ...
-                filterDocType: ''   // '' | 'MAGANG BROILER' | ...
+                filterDocType: ''   // '' | 'LAPORAN A' | ...
             });
 
             const [formData, setFormData] = useState({
@@ -345,7 +345,7 @@
                                 <h1 className="text-2xl md:text-3xl font-black font-poppins text-blue-900 tracking-tight">
                                     MBKM<span className="text-blue-500">.</span>Submission
                                 </h1>
-                                <p className={`text-xs text-gray-500 ${fontRegular}`}>Kampus Merdeka - Integrasi Google Drive</p>
+                                <p className={`text-xs text-gray-500 ${fontRegular}`}>Batch Storage Up To 2TB</p>
                             </div>
                             <button 
                                 onClick={() => setViewMode(viewMode === 'form' ? 'list' : 'form')}
@@ -392,9 +392,11 @@
                                             <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Jenis Dokumen *</label>
                                             <select required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} value={formData.jenisDokumen} onChange={e => setFormData({...formData, jenisDokumen: e.target.value})}>
                                                 <option value="">Pilih Jenis...</option>
-                                                <option value="MAGANG BROILER">MAGANG BROILER</option>
-                                                <option value="MAGANG RPHU/RPA">MAGANG RPHU/RPA</option>
-                                                <option value="PKM">PKM (PENGABDIAN)</option>
+                                                <option value="LAPORAN A">LAPORAN A</option>
+                                                <option value="LAPORAN B">LAPORAN B</option>
+                                                <option value="LAPORAN C">LAPORAN C</option>
+                                                <option value="LAPORAN A">LAPORAN D</option>
+                                                <option value="LAPORAN B">LAPORAN E</option>
                                             </select>
                                         </div>
                                     </div>
@@ -504,9 +506,9 @@
                                                     onChange={(e) => setFilterConfig({...filterConfig, filterDocType: e.target.value})}
                                                 >
                                                     <option value="">Semua Jenis</option>
-                                                    <option value="MAGANG BROILER">MAGANG BROILER</option>
-                                                    <option value="MAGANG RPHU/RPA">MAGANG RPHU/RPA</option>
-                                                    <option value="PKM">PKM (PENGABDIAN)</option>
+                                                    <option value="LAPORAN A">LAPORAN A</option>
+                                                    <option value="LAPORAN B">LAPORAN B</option>
+                                                    <option value="LAPORAN C">LAPORAN C</option>
                                                 </select>
                                                 <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
                                             </div>
