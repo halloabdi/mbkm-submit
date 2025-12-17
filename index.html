@@ -74,12 +74,12 @@
             const [filterConfig, setFilterConfig] = useState({
                 sortName: '',       // '' | 'asc' (A-Z) | 'desc' (Z-A)
                 sortTime: 'newest', // 'newest' | 'oldest'
-                filterClass: '',    // '' | 'CLASS A' | ...
-                filterDocType: ''   // '' | 'LAPORAN A' | ...
+                filterClass: '',    // '' | 'AGRINAK A' | ...
+                filterDocType: ''   // '' | 'MAGANG BROILER' | ...
             });
 
             const [formData, setFormData] = useState({
-                nama: '', ID CARD: '', kelas: '', jenisDokumen: '', judulLaporan: '', files: []
+                nama: '', nim: '', kelas: '', jenisDokumen: '', judulLaporan: '', files: []
             });
             
             const [status, setStatus] = useState({ loading: false, type: '', msg: '' }); 
@@ -127,7 +127,7 @@
                         const dateStr = item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString('id-ID').toLowerCase() : '';
                         return (
                             (item.nama && item.nama.toLowerCase().includes(lowerQuery)) ||
-                            (item.ID CARD && item.ID CARD.toLowerCase().includes(lowerQuery)) ||
+                            (item.nim && item.nim.toLowerCase().includes(lowerQuery)) ||
                             (item.kelas && item.kelas.toLowerCase().includes(lowerQuery)) ||
                             (item.jenisDokumen && item.jenisDokumen.toLowerCase().includes(lowerQuery)) ||
                             (item.judulLaporan && item.judulLaporan.toLowerCase().includes(lowerQuery)) ||
@@ -199,7 +199,7 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!user) return alert("Menunggu koneksi database...");
-                if (formData.files.length === 0) return alert("Pilih miID CARDal 1 file.");
+                if (formData.files.length === 0) return alert("Pilih minimal 1 file.");
 
                 setStatus({ loading: true, type: 'upload', msg: 'Memulai...' });
 
@@ -221,7 +221,7 @@
                                 base64: file.base64,
                                 mimeType: file.type,
                                 filename: `${formData.nama}_${formData.kelas}_${file.name}`,
-                                nama: formData.nama, ID CARD: formData.ID CARD, kelas: formData.kelas
+                                nama: formData.nama, nim: formData.nim, kelas: formData.kelas
                             })
                         });
 
@@ -250,7 +250,7 @@
                     });
 
                     setUploadSuccessData({ folder: targetFolderName, url: lastUploadedFileUrl });
-                    setFormData({ nama: '', ID CARD: '', kelas: '', jenisDokumen: '', judulLaporan: '', files: [] });
+                    setFormData({ nama: '', nim: '', kelas: '', jenisDokumen: '', judulLaporan: '', files: [] });
 
                 } catch (err) {
                     alert("TERJADI ERROR SAAT UPLOAD: " + err.message + "\n\nPastikan script Google Apps sudah di-deploy dengan benar.");
@@ -335,7 +335,7 @@
                         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;800;900&display=swap'); 
                         .font-poppins { font-family: 'Poppins', sans-serif; }
                         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                        .aID CARDate-fade-in { aID CARDation: fade-in 0.3s ease-out forwards; }
+                        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
                     `}</style>
 
                     {/* HEADER */}
@@ -345,7 +345,7 @@
                                 <h1 className="text-2xl md:text-3xl font-black font-poppins text-blue-900 tracking-tight">
                                     MBKM<span className="text-blue-500">.</span>Submission
                                 </h1>
-                                <p className={`text-xs text-gray-500 ${fontRegular}`}>Storage Up To 2TB</p>
+                                <p className={`text-xs text-gray-500 ${fontRegular}`}>Kampus Merdeka - Integrasi Google Drive</p>
                             </div>
                             <button 
                                 onClick={() => setViewMode(viewMode === 'form' ? 'list' : 'form')}
@@ -360,7 +360,7 @@
                     <main className="max-w-4xl mx-auto px-4 py-8">
                         
                         {viewMode === 'form' && (
-                            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 aID CARDate-fade-in overflow-hidden">
+                            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 animate-fade-in overflow-hidden">
                                 <div className="bg-blue-600 p-6 text-white relative">
                                     <h2 className="text-2xl font-black font-poppins mb-2">Form Pengumpulan</h2>
                                     <p className={`text-blue-100 ${fontRegular}`}>Pastikan file yang diupload sudah benar.</p>
@@ -373,8 +373,8 @@
                                             <input required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} placeholder="Nama Lengkap" value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} />
                                         </div>
                                         <div>
-                                            <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>ID CARD *</label>
-                                            <input required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} placeholder="Hanya angka & titik" value={formData.ID CARD} onChange={e => {if(/^[0-9.]*$/.test(e.target.value)) setFormData({...formData, ID CARD: e.target.value})}} />
+                                            <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>NIM *</label>
+                                            <input required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} placeholder="Hanya angka & titik" value={formData.nim} onChange={e => {if(/^[0-9.]*$/.test(e.target.value)) setFormData({...formData, nim: e.target.value})}} />
                                         </div>
                                     </div>
 
@@ -383,20 +383,18 @@
                                             <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Kelas *</label>
                                             <select required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} value={formData.kelas} onChange={e => setFormData({...formData, kelas: e.target.value})}>
                                                 <option value="">Pilih Kelas...</option>
-                                                <option value="CLASS A">CLASS A</option>
-                                                <option value="CLASS B">CLASS B</option>
-                                                <option value="CLASS C">CLASS C</option>
+                                                <option value="AGRINAK A">AGRINAK A</option>
+                                                <option value="AGRINAK B">AGRINAK B</option>
+                                                <option value="AGRINAK C">AGRINAK C</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label className={`block text-gray-700 text-sm ${fontBold} mb-1`}>Jenis Dokumen *</label>
                                             <select required className={`w-full border-2 border-gray-200 rounded-xl p-3 ${fontRegular}`} value={formData.jenisDokumen} onChange={e => setFormData({...formData, jenisDokumen: e.target.value})}>
                                                 <option value="">Pilih Jenis...</option>
-                                                <option value="LAPORAN A">LAPORAN A</option>
-                                                <option value="LAPORAN B">LAPORAN B</option>
-                                                <option value="LAPORAN C">LAPORAN C</option>
-                                                <option value="LAPORAN D">LAPORAN D</option>
-                                                <option value="LAPORAN E">LAPORAN E</option>
+                                                <option value="MAGANG BROILER">MAGANG BROILER</option>
+                                                <option value="MAGANG RPHU/RPA">MAGANG RPHU/RPA</option>
+                                                <option value="PKM">PKM (PENGABDIAN)</option>
                                             </select>
                                         </div>
                                     </div>
@@ -422,14 +420,14 @@
                                     </div>
 
                                     <button type="submit" disabled={status.loading} className={`w-full flex justify-center items-center gap-2 bg-gray-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-gray-800 transition disabled:opacity-70`}>
-                                        {status.loading && status.type === 'upload' ? <><Loader2 className="aID CARDate-spin" /> {status.msg}</> : <><Send size={18} /> Kirim Laporan</>}
+                                        {status.loading && status.type === 'upload' ? <><Loader2 className="animate-spin" /> {status.msg}</> : <><Send size={18} /> Kirim Laporan</>}
                                     </button>
                                 </form>
                             </div>
                         )}
 
                         {viewMode === 'list' && (
-                            <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 aID CARDate-fade-in">
+                            <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 animate-fade-in">
                                 <div className="flex flex-col mb-6 gap-4">
                                     <div className="flex justify-between items-center">
                                         <div>
@@ -451,7 +449,7 @@
                                             <Search className="absolute left-3 top-3.5 text-gray-400" size={18} />
                                             <input 
                                                 type="text"
-                                                placeholder="Cari Nama, ID CARD, Judul, Kelas, Dokumen, atau Waktu..."
+                                                placeholder="Cari Nama, NIM, Judul, Kelas, Dokumen, atau Waktu..."
                                                 className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-poppins focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -492,9 +490,9 @@
                                                     onChange={(e) => setFilterConfig({...filterConfig, filterClass: e.target.value})}
                                                 >
                                                     <option value="">Semua Kelas</option>
-                                                    <option value="CLASS A">CLASS A</option>
-                                                    <option value="CLASS B">CLASS B</option>
-                                                    <option value="CLASS C">CLASS C</option>
+                                                    <option value="AGRINAK A">AGRINAK A</option>
+                                                    <option value="AGRINAK B">AGRINAK B</option>
+                                                    <option value="AGRINAK C">AGRINAK C</option>
                                                 </select>
                                                 <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
                                             </div>
@@ -506,11 +504,9 @@
                                                     onChange={(e) => setFilterConfig({...filterConfig, filterDocType: e.target.value})}
                                                 >
                                                     <option value="">Semua Jenis</option>
-                                                    <option value="LAPORAN A">LAPORAN A</option>
-                                                    <option value="LAPORAN B">LAPORAN B</option>
-                                                    <option value="LAPORAN C">LAPORAN C</option>
-                                                    <option value="LAPORAN D">LAPORAN D</option>
-                                                    <option value="LAPORAN E">LAPORAN E</option>
+                                                    <option value="MAGANG BROILER">MAGANG BROILER</option>
+                                                    <option value="MAGANG RPHU/RPA">MAGANG RPHU/RPA</option>
+                                                    <option value="PKM">PKM (PENGABDIAN)</option>
                                                 </select>
                                                 <ChevronDown size={14} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
                                             </div>
@@ -544,7 +540,7 @@
                                             <div className="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-400">
                                                 <span>{item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString() : '-'}</span>
                                                 <button onClick={() => requestProtectedAction('delete', item)} disabled={status.loading} className="flex items-center gap-1 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition font-bold disabled:opacity-50">
-                                                    {status.loading && status.type === 'delete' ? <Loader2 size={14} className="aID CARDate-spin"/> : <Trash2 size={14}/>} Hapus
+                                                    {status.loading && status.type === 'delete' ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>} Hapus
                                                 </button>
                                             </div>
                                         </div>
@@ -560,7 +556,7 @@
 
                     {/* Success Modal */}
                     {uploadSuccessData && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm aID CARDate-fade-in">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
                             <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
                                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500"><CheckCircle size={32} /></div>
                                 <h3 className="text-xl font-black text-gray-900">Upload Berhasil!</h3>
@@ -604,7 +600,7 @@
                     {showErrorPopup && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-900/30 backdrop-blur-md">
                             <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-4 border-red-50">
-                                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 aID CARDate-pulse"><AlertTriangle size={40} /></div>
+                                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 animate-pulse"><AlertTriangle size={40} /></div>
                                 <h3 className="text-2xl font-black text-gray-900 mb-2">Kode Salah!</h3>
                                 <p className="text-sm text-gray-600 mb-6">Anda tidak memiliki izin untuk akses ini.</p>
                                 <button onClick={() => setShowErrorPopup(false)} className="text-gray-400 underline text-sm hover:text-gray-600">Tutup</button>
